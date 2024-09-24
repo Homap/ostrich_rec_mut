@@ -40,8 +40,11 @@ rule all:
         "results/mapped/{sample}.flagstats.txt",
         "results/mapped_dedup/{sample}.dedup.bam",
         "results/mapped_dedup/{sample}.metrics.txt",
-        "config/intervals/interval_{num}.bed"], \
-        sample=fastq_name, pair=config["pair"], genome=config["genome"], num=[i for i in range(1, 17)])
+        "config/intervals/interval_{num}.bed",
+        "data/genome/{genome}.dict",
+        "data/genome/ASM69896v1_HiC.fasta.fai",
+        "results/gvcf/{sample}/{sample}.{num}.gvcf"], \
+        sample=fastq_name, pair=config["pair"], genome=config["genome"], num=[i for i in range(1, 2)])#17)])
 
 rule fastqc:
     input:
@@ -226,29 +229,52 @@ rule create_intervals:
         """
         python workflow/scripts/split_fasta.py data/genome/ASM69896v1_HiC.fasta 1000 86 "config/intervals"
         """
-cat readgroup6x.txt | while read line
-do
-samplename=$(echo $line | cut -f1 -d " ")
-echo $samplename
-echo ${bamdir}/${samplename}.dedup.bam
-mkdir -p ${vcf}/${samplename}
-for interval in ${bed}/*.bed
-do
-echo $interval
-interval_n=$(echo $interval | cut -f8 -d "/" | cut -f1 -d ".")
-echo $interval_n
-sbatch haplotype_caller_ploidy6.sh ${genomedir} $interval ${bamdir}/${samplename}.dedup.bam \
-${vcf}/${samplename}/${samplename}.${interval_n}.gvcf
-done
-done
+
+rule createSeqdict:
+    input:
+        genome_fasta="data/genome/ASM69896v1_HiC.fasta"
+    output:
+        genome_fasta_dict="data/genome/ASM69896v1_HiC.dict"
+    resources:
+        threads=4,
+        mem_mb=24000,
+        runtime="5h",
+        tmpdir="$SNIC_TMP"
+    conda:
+        "envs/picard.yaml"
+    shell:
+        """
+        picard CreateSequenceDictionary \
+        --REFERENCE {input} \
+        --OUTPUT {output}
+        """
+
+rule createSeqfai:
+    input:
+        genome_fasta="data/genome/ASM69896v1_HiC.fasta"
+    output:
+        genome_index="data/genome/ASM69896v1_HiC.fasta.fai"
+    resources:
+        threads= 4,
+        runtime= "2h",
+        tmpdir="$SNIC_TMP"
+    conda:
+        "envs/bwa_samtools.yaml"
+    shell:
+        """
+        samtools faidx {input}
+        """
+
+
 rule HaplotypeCaller_gvcf:
     input:
-       genome_fasta="data/genome/{genome}.fasta"
+        genome_fasta="data/genome/ASM69896v1_HiC.fasta",
+        genome_fasta_dict="data/genome/ASM69896v1_HiC.dict",
+        genome_index="data/genome/ASM69896v1_HiC.fasta.fai",
+        interval="config/intervals/interval_{num}.bed",
         bam="results/mapped_dedup/{sample}.dedup.bam"
     output:
-        gvcf="results/gvcf/{sample}.gvcf"
-    log:
-        "logs/gvcf/{readname}.log"
+        gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
     resources:
         threads=20,
         mem_mb=120000,
@@ -257,17 +283,17 @@ rule HaplotypeCaller_gvcf:
     params:
         mem= "-Xmx120g"
     benchmark:
-        "benchmark/gatk_haplotypecaller/{sample}.gatkHaplotypeCaller.txt"
-    conda:
-        "envs/gatk.yaml"
+        "benchmark/gatk_haplotypecaller/{sample}.{num}.gatkHaplotypeCaller.txt"
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
     shell:
         """
-        gatk HaplotypeCaller -Xmx120g -jar \
+        gatk --java-options {params.mem} HaplotypeCaller \
         -R {input.genome_fasta} \
-        -L $interval \
+        -L {input.interval} \
         -I {input.bam} \
         -O {output} \
-        --tmp-dir {tmpdir} \
+        --tmp-dir {resources.tmpdir} \
         -ERC GVCF
         """
 
