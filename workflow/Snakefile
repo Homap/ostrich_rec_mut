@@ -224,10 +224,10 @@ rule create_intervals:
         intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 17)])
     params:
         min_scaf_len = 1000,
-        num_intervals = 86
+        num_scafs_per_interval = 4
     shell:
         """
-        python workflow/scripts/split_fasta.py data/genome/ASM69896v1_HiC.fasta 1000 86 "config/intervals"
+        python workflow/scripts/split_fasta.py data/genome/ASM69896v1_HiC.fasta {params.min_scaf_len} {params.num_scafs_per_interval} "config/intervals"
         """
 
 rule createSeqdict:
@@ -276,12 +276,12 @@ rule HaplotypeCaller_gvcf:
     output:
         gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
     resources:
-        threads=20,
-        mem_mb=120000,
+        threads=10,
+        mem_mb=64000,
         runtime="24h",
         tmpdir="$SNIC_TMP"
     params:
-        mem= "-Xmx120g"
+        mem= "-Xmx64g"
     benchmark:
         "benchmark/gatk_haplotypecaller/{sample}.{num}.gatkHaplotypeCaller.txt"
     singularity:
@@ -297,30 +297,30 @@ rule HaplotypeCaller_gvcf:
         -ERC GVCF
         """
 
-# # GenomicsDBImport
-# rule genomicsdbimport:
-#     input:
-#         gvcfs=expand("results/gvcf/{readname}.gvcf", readname=samplename)
-#     output:
-#         db=directory("results/genomicsdb/db")
-#     log:
-#         "logs/gatk/genomicsdbimport.log"
-#     params:
-#         intervals="ref"
-#     resources:
-#         mem_mb=
-#         threads=
-#     conda:
-#         "envs/gatk.yaml"
-#     shell:
-#         """
-#         java -Xmx6g -jar $GATK_HOME/gatk-package-4.1.4.1-local.jar GenomicsDBImport \
-#         --genomicsdb-workspace-path $my_database \
-#         --intervals $interval \
-#         --batch-size 50 \
-#         --sample-name-map $cohort_sample_map \
-#         --tmp-dir=$TMPDIR 
-#         """
+# GenomicsDBImport
+rule genomicsdbimport:
+    input:
+        gvcfs=expand("results/gvcf/{readname}.gvcf", readname=samplename)
+    output:
+        db=directory("results/genomicsdb/db")
+    log:
+        "logs/gatk/genomicsdbimport.log"
+    params:
+        intervals="ref"
+    resources:
+        mem_mb=
+        threads=
+    conda:
+        "envs/gatk.yaml"
+    shell:
+        """
+        java -Xmx6g -jar $GATK_HOME/gatk-package-4.1.4.1-local.jar GenomicsDBImport \
+        --genomicsdb-workspace-path $my_database \
+        --intervals $interval \
+        --batch-size 50 \
+        --sample-name-map $cohort_sample_map \
+        --tmp-dir=$TMPDIR 
+        """
 
 # rule GenotypeGVCFs:
 #     input:
