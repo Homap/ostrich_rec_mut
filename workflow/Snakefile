@@ -1,28 +1,26 @@
 __author__ = "Homa Papoli Yazdi"
 __email__ = "homa.papoli_yazdi@biol.lu.se"
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 configfile: "config/config.yaml"
 localrules: all, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals
-
-#----------------------------------------------------------------------------#
-#--------------------Import Python modules-----------------------------------#
-#----------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+#-------------------------------------------------------------Import Python modules----------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 import pandas as pd
 import os
-
-#----------------------------------------------------------------------------#
-#--------------------Reading design table------------------------------------#
-#----------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+#-------------------------------------------------------------Reading design table-----------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 design_table = pd.read_table(config["sample_table"], sep="\t")
 sample_name = design_table.Sample_Name
 fastq_name = design_table.Fastq_Name
-#--------------------Function to get Read Group for each sample--------------#
+#--------------------------------------------------Function to get Read Group for each sample------------------------------------------------------#
 def get_readgroup(sample_name):
     read_group = pd.read_table("config/ReadGroup.txt", sep="\t")
     read_group_dict = dict(read_group.values)
     return read_group_dict[sample_name]
-#----------------------------------------------------------------------------#
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule all:
     input: 
         html_output = expand([
@@ -30,8 +28,8 @@ rule all:
         "data/fastq_bbtools_filtered/{sample}_{pair}_001.filterbytile.fastq.gz",
         "data/fastq_bbtools_filtered/{sample}_{pair}_001.polyfilter.fastq.gz",
         "data/fastq_bbtools_filtered/{sample}_{pair}_001.bbdukpoly.fastq.gz",
-        "results/fastqc_filtered_bbtools/{sample}_{pair}_001.filtered_bbtools_fastqc.html",
-        "results/fastqc_filtered_bbtools/{sample}_{pair}_001.filtered_bbtools_fastqc.zip",
+        "results/fastqc_filtered_bbtools/{sample}_{pair}_001.bbdukpoly_fastqc.html",
+        "results/fastqc_filtered_bbtools/{sample}_{pair}_001.bbdukpoly_fastqc.zip",
         "results/multiqc_filtered_bbtools/multiqc_report_bbtools.html"], \
         sample=fastq_name, pair=config["pair"], genome=config["genome"], num=[i for i in range(1, 2)])#17)])
 # "results/fastqc/{sample}_{pair}_001_fastqc.html",
@@ -54,6 +52,17 @@ rule all:
         # "data/genome/ASM69896v1_HiC.fasta.fai",
         # "results/gvcf/{sample}/{sample}.{num}.gvcf"
 
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Check the genome assembly ASM69896v1_HiC.fasta
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# HiC
+# How do enhancers target to specific genes from a distance? Very often, enhancers can be looped to the promoter of the gene undergoing expression.
+# Chromatin is packaged into the nucleus. Filling the human genome into the nucleus is similar to fill a string of 44 miles long into a basketball.
+# Enhancer-Promoter Interactions Relate to Disseases - Oncogene on/off Flavahan et al Nature 2015 and Hnsiz et al Science 2016. Polyploidy and Chromatin interaction- MYC example
+# Chromatin Conformation Capture : Early technique
+
+
+
 # rule fastqc:
 #     input:
 #        fastq="data/fastq/{sample}_{pair}_001.fastq.gz",
@@ -64,11 +73,9 @@ rule all:
 #         outdir="results/fastqc",
 #         sample_adapter="data/adapters/adapters.txt"
 #     resources:
-#         threads = 4,
-#         mem_mb = 24000,
+#         threads = 1,
+#         mem_mb = 64000,
 #         runtime = "3h"
-# #    conda:
-# #        "envs/fastqc.yaml"
 #     singularity:
 #         "containers/fastqc_0.12.1.sif"
 #     shell:
@@ -85,8 +92,6 @@ rule all:
 #         expand("results/fastqc/{sample}_{pair}_001_fastqc.zip", sample=fastq_name, pair=config["pair"])
 #     output:
 #         "results/multiqc/multiqc_report.html"
-# #    conda:
-# #        "envs/multiqc.yaml"
 #     singularity:
 #         "containers/multiqc_v1.25.sif"
 #     shell:
@@ -108,8 +113,6 @@ rule all:
 #     resources:
 #         threads=10,
 #         runtime="12h"
-# #    conda:
-# #        "envs/fastp.yaml"
 #     singularity:
 #         "containers/fastp_0.23.4.sif"
 #     shell:
@@ -142,11 +145,9 @@ rule all:
 #         outdir="results/fastqc_filtered",
 #         sample_adapter="data/adapters/adapters.txt"
 #     resources:
-#         threads = 4,
-#         mem_mb = 24000,
+#         threads = 1,
+#         mem_mb = 6400,
 #         runtime = "3h"
-# #    conda:
-# #        "envs/fastqc.yaml"
 #     singularity:
 #         "containers/fastqc_0.12.1.sif"
 #     shell:
@@ -175,15 +176,15 @@ rule adapter_trim_bbduk:
         fastq1="data/fastq/{sample}_R1_001.fastq.gz",
         fastq2="data/fastq/{sample}_R2_001.fastq.gz"
     output:
-        fastq_out1="data/fastq_bbtools_filtered/{sample}_R1_001.adapters.fastq.gz",
-        fastq_out2="data/fastq_bbtools_filtered/{sample}_R2_001.adapters.fastq.gz",
+        fastq_out1=temp("data/fastq_bbtools_filtered/{sample}_R1_001.adapters.fastq.gz"),
+        fastq_out2=temp("data/fastq_bbtools_filtered/{sample}_R2_001.adapters.fastq.gz"),
         stats="data/fastq_bbtools_filtered/{sample}.stats.txt"
     params:
         adapter_fasta="data/adapters/adapters.fasta",
         mem="-Xmx36g"
     resources:
         threads=6,
-        runtime="12h",
+        runtime="5h",
         mem_mb=36000
     singularity:
         "containers/bbtools_39.10.sif"
@@ -205,13 +206,13 @@ rule filterbytile:
         fastq1="data/fastq_bbtools_filtered/{sample}_R1_001.adapters.fastq.gz",
         fastq2="data/fastq_bbtools_filtered/{sample}_R2_001.adapters.fastq.gz"
     output:
-        fastq_out1="data/fastq_bbtools_filtered/{sample}_R1_001.filterbytile.fastq.gz",
-        fastq_out2="data/fastq_bbtools_filtered/{sample}_R2_001.filterbytile.fastq.gz"
+        fastq_out1=temp("data/fastq_bbtools_filtered/{sample}_R1_001.filterbytile.fastq.gz"),
+        fastq_out2=temp("data/fastq_bbtools_filtered/{sample}_R2_001.filterbytile.fastq.gz")
     params:
         mem="-Xmx55g"
     resources:
         threads=10,
-        runtime="12h",
+        runtime="5h",
         mem_mb=60000
     singularity:
         "containers/bbtools_39.10.sif"
@@ -225,14 +226,14 @@ rule polyfilter:
         fastq1="data/fastq_bbtools_filtered/{sample}_R1_001.filterbytile.fastq.gz",
         fastq2="data/fastq_bbtools_filtered/{sample}_R2_001.filterbytile.fastq.gz",
     output:
-        fastq_out1="data/fastq_bbtools_filtered/{sample}_R1_001.polyfilter.fastq.gz",
-        fastq_out2="data/fastq_bbtools_filtered/{sample}_R2_001.polyfilter.fastq.gz",
+        fastq_out1=temp("data/fastq_bbtools_filtered/{sample}_R1_001.polyfilter.fastq.gz"),
+        fastq_out2=temp("data/fastq_bbtools_filtered/{sample}_R2_001.polyfilter.fastq.gz"),
         outb="data/fastq_bbtools_filtered/{sample}.homopolymers.fastq.gz"
     params:
         mem="-Xmx55g"
     resources:
         threads=10,
-        runtime="12h",
+        runtime="5h",
         mem_mb=60000
     singularity:
         "containers/bbtools_39.10.sif"
@@ -259,7 +260,7 @@ rule bbduk_polyg:
         mem="-Xmx55g"
     resources:
         threads=10,
-        runtime="12h",
+        runtime="4h",
         mem_mb=60000
     singularity:
         "containers/bbtools_39.10.sif"
@@ -272,9 +273,8 @@ rule bbduk_polyg:
         out2={output.fastq_out2} \
         minlen=140 \
         threads={resources.threads} \
-        literal="GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG, polyGC, polyGA, polyGT" \
+        literal="polyG,polyC,polyGC,polyGA,polyGT" \
         trimpolya=20 \
-        trimpolyt=20 \
         trimpolyg=20 \
         trimpolyc=20 \
         stats={output.stats}
@@ -284,29 +284,27 @@ rule fastqc_after_filtering_bbtools:
     input:
        fastq="data/fastq_bbtools_filtered/{sample}_{pair}_001.bbdukpoly.fastq.gz"
     output:
-        fastqc_html="results/fastqc_filtered_bbtools/{sample}_{pair}_001.filtered_bbtools_fastqc.html",
-        fastqc_zip="results/fastqc_filtered_bbtools/{sample}_{pair}_001.filtered_bbtools_fastqc.zip"
+        fastqc_html="results/fastqc_filtered_bbtools/{sample}_{pair}_001.bbdukpoly_fastqc.html",
+        fastqc_zip="results/fastqc_filtered_bbtools/{sample}_{pair}_001.bbdukpoly_fastqc.zip"
     params:
         outdir="results/fastqc_filtered_bbtools",
-        sample_adapter="data/adapters/adapters.txt"
     resources:
         threads = 4,
         mem_mb = 24000,
-        runtime = "3h"
+        runtime = "4h"
     singularity:
         "containers/fastqc_0.12.1.sif"
     shell:
         """
         fastqc {input} \
-        threads {resources.threads} \
+        --threads {resources.threads} \
         --outdir {params.outdir} \
-        --kmers 7 \
-        --adapters {params.sample_adapter}
+        --kmers 7 
         """
 
 rule multiqc_after_filtering_bbtools:
     input:
-        expand("results/fastqc_filtered_bbtools/{sample}_{pair}_001.filtered_bbtools_fastqc.zip", sample=fastq_name, pair=config["pair"])
+        expand("results/fastqc_filtered_bbtools/{sample}_{pair}_001.bbdukpoly_fastqc.zip", sample=fastq_name, pair=config["pair"])
     output:
         "results/multiqc_filtered_bbtools/multiqc_report_bbtools.html"
 #    conda:
@@ -314,76 +312,137 @@ rule multiqc_after_filtering_bbtools:
     singularity:
         "containers/multiqc_v1.25.sif"
     shell:
-        "multiqc results/fastqc_filtered_bbtools/*filtered_bbtools_fastqc.zip -o results/multiqc_filtered_bbtools"
+        "multiqc results/fastqc_filtered_bbtools/*bbdukpoly_fastqc.zip -o results/multiqc_filtered_bbtools"
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Create Genome Indices
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule bwa_index:
+    input:
+        "data/genome/{genome}.fasta",
+    output:
+        idx=multiext("data/genome/{genome}.fasta", ".amb", ".ann", ".bwt", ".pac", ".sa")
+    resources:
+        threads= 3,
+        runtime= "2h"
+    singularity:
+        "containers/bwa_0.7.18.sif"
+    shell:
+        """
+        bwa index {input}
+        """
 
+rule createSeqdict:
+    input:
+        genome_fasta="data/genome/{genome}.fasta"
+    output:
+        genome_fasta_dict="data/genome/{genome}.dict"
+    resources:
+        threads=4,
+        runtime="5h",
+    singularity:
+        "containers/picard_3.2.0.sif"
+    shell:
+        """
+        java -jar /usr/picard/picard.jar CreateSequenceDictionary \
+        --REFERENCE {input} \
+        --OUTPUT {output}
+        """
 
-
-# rule bwa_index:
-#     input:
-#         "data/genome/{genome}.fasta",
-#     output:
-#         idx=multiext("data/genome/{genome}.fasta", ".amb", ".ann", ".bwt", ".pac", ".sa")
-#     log:
-#         "logs/bwa_index/{genome}.log"
-#     resources:
-#         threads= 10,
-#         runtime= "2h"
-#     conda:
-#         "envs/bwa_samtools.yaml"
-#     shell:
-#         """
-#         bwa index {input}
-#         """
-
-# rule bwa_mem:
-#     input:
-#         fastq1="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
-#         fastq2="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
-#         genome_fasta="data/genome/ASM69896v1_HiC.fasta"
-#     output:
-#         bam="results/mapped/{sample}.sorted.bam",
-#         bai="results/mapped/{sample}.sorted.bai",
-#         flagstats="results/mapped/{sample}.flagstats.txt"
-#     params:
-#         readgroup=lambda wildcards: get_readgroup(wildcards.sample)
-#     resources:
-#         threads= 18,
-#         runtime= "18h",
-#         mem_mb= 115200,
-#         tmpdir="$SNIC_TMP"
-#     conda:
-#         "envs/bwa_samtools.yaml"
-#     shell:
-#         """
-#         bwa mem -M -t {resources.threads} -R {params.readgroup} {input.genome_fasta} {input.fastq1} {input.fastq2} | tee >(samtools flagstat - > {output.flagstats}) | \
-#         samtools sort -T {resources.tmpdir} -O BAM | tee {output.bam} | samtools index - {output.bai}
-#         """
-
-# rule markduplicates_bam:
-#     input:
-#         bam="results/mapped/{sample}.sorted.bam"
-#     output:
-#         dedupBam="results/mapped_dedup/{sample}.dedup.bam",
-#         metrics="results/mapped_dedup/{sample}.metrics.txt"
-#     resources:
-#         threads=20,
-#         mem_mb=120000,
-#         runtime="12h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx120g"
-#     benchmark:
-#         "benchmark/mapped_dedup/{sample}.picardMarkDuplicates.txt"
-#     conda:
-#         "envs/picard.yaml"
-#     shell:
-#         """
-#         picard MarkDuplicates {params.mem} --INPUT {input} --OUTPUT {output.dedupBam} --METRICS_FILE {output.metrics} --TMP_DIR {resources.tmpdir} \
-#         --VALIDATION_STRINGENCY LENIENT \
-#         --ASSUME_SORT_ORDER coordinate \
-#         --CREATE_INDEX TRUE
-#         """
-# # Create a list of intervals for scaffolds larger than 1000 bp to use with Haplotype Caller:
+rule createSeqfai:
+    input:
+        genome_fasta="data/genome/{genome}.fasta"
+    output:
+        genome_index="data/genome/{genome}.fasta.fai"
+    resources:
+        threads= 4,
+        runtime= "2h",
+    singularity:
+        "containers/samtools_1.20.c.sif"
+    shell:
+        """
+        samtools faidx {input}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Mapping
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule bwa_mem:
+    input:
+        fastq1="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
+        fastq2="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
+        genome_fasta="data/genome/ASM69896v1_HiC.fasta"
+        amb="data/genome/ASM69896v1_HiC.fasta.amb",
+        ann="data/genome/ASM69896v1_HiC.fasta.ann",
+        bwt="data/genome/ASM69896v1_HiC.fasta.bwt",
+        pac="data/genome/ASM69896v1_HiC.fasta.pac",
+        sa="data/genome/ASM69896v1_HiC.fasta.sa"
+    output:
+        sam=temp("results/mapped/{sample}.sam")
+    params:
+        readgroup=lambda wildcards: get_readgroup(wildcards.sample)
+    resources:
+        threads= 18,
+        runtime= "18h",
+        mem_mb= 115200,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bwa_0.7.18.sif",
+    shell:
+        """
+        bwa mem -M -t {resources.threads} -R {params.readgroup} {input.genome_fasta} {input.fastq1} {input.fastq2} > {output.sam}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# SAM to BAM - Sorting - Getting BAM statistics
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule samtools_sam:
+    input:
+        sam="results/mapped/{sample}.sam"
+    output:
+        bam=temp("results/mapped/{sample}.sorted.bam"),
+        bai="results/mapped/{sample}.sorted.bai",
+        flagstats="results/mapped/{sample}.flagstats.txt",
+        idxstat="results/mapped/{sample}.idxstat.txt"
+    resources:
+        threads= 10,
+        runtime= "10h",
+        tmpdir="$SNIC_TMP"
+    benchmark:
+        "benchmark/samtools_sam/{sample}.samtools_sam.txt"
+    singularity:
+        "containers/samtools_1.20.c.sif"
+    shell:
+        """
+        samtools flagstat {input.sam} > {output.flagstats}
+        samtools sort {input.sam} -T {resources.tmpdir} -O BAM | tee {output.bam} | samtools index - {output.bai}
+        samtools idxstats {output.bam} > {output.idxstat}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Mark duplicates in BAM file
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule markduplicates_bam:
+    input:
+        bam="results/mapped/{sample}.sorted.bam"
+    output:
+        dedupBam=protected("results/mapped_dedup/{sample}.dedup.bam"),
+        metrics="results/mapped_dedup/{sample}.metrics.txt"
+    resources:
+        threads=15,
+        runtime="12h",
+        mem_mb=90000,
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx90g"
+    benchmark:
+        "benchmark/mapped_dedup/{sample}.picardMarkDuplicates.txt"
+    singularity:
+        "containers/picard_3.2.0.sif"
+    shell:
+        """
+        java {params.mem} -jar /usr/picard/picard.jar MarkDuplicates --INPUT {input} --OUTPUT {output.dedupBam} --METRICS_FILE {output.metrics} --TMP_DIR {resources.tmpdir} \
+        --VALIDATION_STRINGENCY LENIENT \
+        --ASSUME_SORT_ORDER coordinate \
+        --CREATE_INDEX TRUE
+        """
+# # Create a list of intervals for scaffolds larger than 1000 bp to use with Haplotype Caller: Remove min_scaf_len, include everything
 # rule create_intervals:
 #     input:
 #         genome="data/genome/ASM69896v1_HiC.fasta"
@@ -396,42 +455,51 @@ rule multiqc_after_filtering_bbtools:
 #         """
 #         python workflow/scripts/split_fasta.py data/genome/ASM69896v1_HiC.fasta {params.min_scaf_len} {params.num_scafs_per_interval} "config/intervals"
 #         """
-
-# rule createSeqdict:
-#     input:
-#         genome_fasta="data/genome/ASM69896v1_HiC.fasta"
-#     output:
-#         genome_fasta_dict="data/genome/ASM69896v1_HiC.dict"
-#     resources:
-#         threads=4,
-#         mem_mb=24000,
-#         runtime="5h",
-#         tmpdir="$SNIC_TMP"
-#     conda:
-#         "envs/picard.yaml"
-#     shell:
-#         """
-#         picard CreateSequenceDictionary \
-#         --REFERENCE {input} \
-#         --OUTPUT {output}
-#         """
-
-# rule createSeqfai:
-#     input:
-#         genome_fasta="data/genome/ASM69896v1_HiC.fasta"
-#     output:
-#         genome_index="data/genome/ASM69896v1_HiC.fasta.fai"
-#     resources:
-#         threads= 4,
-#         runtime= "2h",
-#         tmpdir="$SNIC_TMP"
-#     conda:
-#         "envs/bwa_samtools.yaml"
-#     shell:
-#         """
-#         samtools faidx {input}
-#         """
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule create_intervals:
+    input:
+        genome="data/genome/Lbolanderi.fasta"
+    output:
+        intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 48)])
+    params:
+        num_scafs_per_interval = 300,
+        intervals_dir="config/intervals"
+    shell:
+        """
+        python workflow/scripts/split_fasta.py {input.genome} {params.num_scafs_per_interval} {params.intervals_dir}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule HaplotypeCaller_gvcf:
+    input:
+        genome_fasta="data/genome/ASM69896v1_HiC.fasta",
+        genome_fasta_dict="data/genome/ASM69896v1_HiC.dict",
+        genome_index="data/genome/ASM69896v1_HiC.fasta.fai",
+        bam="results/mapped_dedup/{sample}.dedup.bam"
+    output:
+        gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
+    resources:
+        threads=2,
+        mem_mb=12000,
+        runtime="24h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx12g",
+        interval="config/intervals/interval_{num}.bed",
+        ploidy=lambda wildcards: get_ploidy(wildcards.sample)
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} HaplotypeCaller \
+        -R {input.genome_fasta} \
+        -I {input.bam} \
+        -O {output.gvcf} \
+        -L {params.interval} \
+        -ploidy {params.ploidy} \
+        --tmp-dir {resources.tmpdir} \
+        -ERC GVCF
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 
 # rule HaplotypeCaller_gvcf:
 #     input:
